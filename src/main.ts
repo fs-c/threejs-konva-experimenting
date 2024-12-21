@@ -248,107 +248,72 @@ layer.on('draw', () => {
     });
 }
 
-const isNode = false;
+function simulateMouseDown(stage: Konva.Stage, pos: { x: number; y: number }) {
+    // simulatePointerDown(stage, pos);
 
-function simulateMouseDown(stage, pos) {
-    simulatePointerDown(stage, pos);
-    var top = isNode ? 0 : stage.content.getBoundingClientRect().top;
+    stage._pointerdown(
+        new MouseEvent('mousedown', {
+            clientX: pos.x,
+            clientY: pos.y,
+            button: 0,
+        })
+    );
+}
 
-    stage._pointerdown({
+function simulateMouseMove(stage: Konva.Stage, pos: { x: number; y: number }) {
+    // simulatePointerMove(stage, pos);
+
+    const event = new MouseEvent('mousemove', {
         clientX: pos.x,
-        clientY: pos.y + top,
-        button: pos.button || 0,
-        type: 'mousedown',
+        clientY: pos.y,
+        button: 0,
     });
+
+    Konva.DD._drag(event);
+    // stage._pointermove(event);
 }
 
-function simulateMouseMove(stage, pos) {
-    simulatePointerMove(stage, pos);
-    var top = isNode ? 0 : stage.content.getBoundingClientRect().top;
+function simulateMouseUp(stage: Konva.Stage, pos: { x: number; y: number }) {
+    // simulatePointerUp(stage, pos);
+
     var evt = {
         clientX: pos.x,
-        clientY: pos.y + top,
-        button: pos.button || 0,
-        type: 'mousemove',
-    };
-
-    Konva.DD._drag(evt);
-    stage._pointermove(evt);
-}
-
-function simulateMouseUp(stage, pos) {
-    simulatePointerUp(stage, pos);
-    var top = isNode ? 0 : stage.content.getBoundingClientRect().top;
-    var evt = {
-        clientX: pos.x,
-        clientY: pos.y + top,
+        clientY: pos.y,
         button: pos.button || 0,
         type: 'mouseup',
     };
 }
 
-function simulatePointerDown(stage: Konva.Stage, pos) {
-    var top = isNode ? 0 : stage.content.getBoundingClientRect().top;
-
+function simulatePointerDown(stage: Konva.Stage, pos: { x: number; y: number }) {
     stage._pointerdown({
         clientX: pos.x,
-        clientY: pos.y + top,
+        clientY: pos.y,
         button: pos.button || 0,
         pointerId: pos.pointerId || 1,
         type: 'pointerdown',
     } as any);
 }
 
-function simulatePointerMove(stage: Konva.Stage, pos) {
-    var top = isNode ? 0 : stage.content.getBoundingClientRect().top;
+function simulatePointerMove(stage: Konva.Stage, pos: { x: number; y: number }) {
     var evt = {
         clientX: pos.x,
-        clientY: pos.y + top,
+        clientY: pos.y,
         button: pos.button || 0,
         pointerId: pos.pointerId || 1,
         type: 'pointermove',
     };
 
     stage._pointermove(evt as any);
-    // Konva.DD._drag(evt);
 }
 
-function simulatePointerUp(stage: Konva.Stage, pos) {
-    var top = isNode ? 0 : stage.content.getBoundingClientRect().top;
+function simulatePointerUp(stage: Konva.Stage, pos: { x: number; y: number }) {
     var evt = {
         clientX: pos.x,
-        clientY: pos.y + top,
+        clientY: pos.y,
         button: pos.button || 0,
         pointerId: pos.pointerId || 1,
         type: 'pointerup',
     };
 
-    // Konva.DD._endDragBefore(evt);
     stage._pointerup(evt as any);
-    // Konva.DD._endDragAfter(evt);
-}
-
-function TRANSFORMERsimulateMouseDown(tr, pos) {
-    simulateMouseDown(tr.getStage(), pos);
-}
-
-function TRANSFORMERsimulateMouseMove(tr, pos) {
-    const stage = tr.getStage();
-    var top = (stage.content && stage.content.getBoundingClientRect().top) || 0;
-    tr._handleMouseMove({
-        ...pos,
-        clientX: pos.x,
-        clientY: pos.y + top,
-    });
-    simulateMouseMove(stage, pos);
-}
-
-function TRANSFORMERsimulateMouseUp(tr: Konva.Transformer, pos = { x: 0, y: 0 }) {
-    const stage = tr.getStage();
-    var top = (stage.content && stage.content.getBoundingClientRect().top) || 0;
-    tr._handleMouseUp({
-        clientX: pos.x,
-        clientY: pos.y + top,
-    });
-    simulateMouseUp(tr.getStage(), pos || { x: 1, y: 1 });
 }
