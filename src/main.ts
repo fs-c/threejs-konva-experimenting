@@ -1,3 +1,4 @@
+// @ts-expect-error no types for styling
 import './style.css';
 
 import * as THREE from 'three';
@@ -5,7 +6,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import Konva from 'konva';
 
 const initializeKonva = (
-    container: HTMLDivElement
+    container: HTMLDivElement,
 ): { layer: Konva.Layer; transformer: Konva.Transformer; stage: Konva.Stage } => {
     const containerDimensions = container.getBoundingClientRect();
     const height = Math.min(containerDimensions.width, containerDimensions.height);
@@ -60,7 +61,7 @@ const initializeKonva = (
 
 const initializeThree = (
     container: HTMLElement,
-    canvas: HTMLCanvasElement
+    canvas: HTMLCanvasElement,
 ): {
     updateTexture: () => {};
     camera: THREE.PerspectiveCamera;
@@ -105,11 +106,6 @@ const initializeThree = (
     };
 };
 
-const getCanvasForLayer = (layer: Konva.Layer): HTMLCanvasElement => {
-    // this is not documented
-    return layer.getCanvas()._canvas;
-};
-
 const konvaContainer = document.getElementById('konva-container');
 if (!konvaContainer || !(konvaContainer instanceof HTMLDivElement)) {
     throw new Error('Konva container not found or not a <div>');
@@ -120,134 +116,13 @@ if (!threeContainer) {
     throw new Error('Three container not found');
 }
 
-const { layer, transformer, stage } = initializeKonva(konvaContainer);
+const { layer, stage } = initializeKonva(konvaContainer);
 
-const setupMouseEventsPassthrough = (
-    fromElement: HTMLElement,
-    toElement: HTMLElement,
-    getPositionFromEvent: (event: MouseEvent) => { x: number; y: number } | null
-) => {
-    const handleMouseDown = (event: MouseEvent) => {
-        const position = getPositionFromEvent(event);
-        if (position == null) {
-            return;
-        }
-
-        // simulateMouseDown(stage, position);
-        toElement.dispatchEvent(
-            new MouseEvent('mousedown', { clientX: position.x, clientY: position.y })
-        );
-        event.stopPropagation();
-    };
-    const handleMouseMove = (event: MouseEvent) => {
-        const position = getPositionFromEvent(event);
-        if (position == null) {
-            return;
-        }
-
-        // simulateMouseMove(stage, position);
-        toElement.dispatchEvent(
-            new MouseEvent('mousemove', { clientX: position.x, clientY: position.y })
-        );
-        event.stopPropagation();
-    };
-    const handleMouseUp = (event: MouseEvent) => {
-        const position = getPositionFromEvent(event);
-        if (position == null) {
-            return;
-        }
-
-        // simulateMouseUp(stage, position);
-        toElement.dispatchEvent(
-            new MouseEvent('mouseup', { clientX: position.x, clientY: position.y })
-        );
-        event.stopPropagation();
-    };
-
-    fromElement.addEventListener('mousedown', handleMouseDown);
-    fromElement.addEventListener('mousemove', handleMouseMove);
-    fromElement.addEventListener('mouseup', handleMouseUp);
-
-    return () => {
-        fromElement.removeEventListener('mousedown', handleMouseDown);
-        fromElement.removeEventListener('mousemove', handleMouseMove);
-        fromElement.removeEventListener('mouseup', handleMouseUp);
-    };
-
-    // const eventNamesWithNewState = [
-    //     ['mousedown', true],
-    //     ['mousemove', undefined],
-    //     ['mouseup', false],
-    // ] as const;
-
-    // let isHoldingMouseDown = false;
-
-    // for (const [eventName, newMouseDownState] of eventNamesWithNewState) {
-    //     fromElement.addEventListener(eventName, (event) => {
-    //         if (event.button !== 0) {
-    //             return;
-    //         }
-
-    //         if (newMouseDownState == null && !isHoldingMouseDown) {
-    //             return;
-    //         }
-
-    //         if (newMouseDownState != null) {
-    //             isHoldingMouseDown = newMouseDownState;
-    //         }
-
-    //         const newEventParams = transformEvent(event);
-    //         if (!newEventParams) {
-    //             return;
-    //         }
-
-    //         // const fakeEvent = new MouseEvent(eventName, newEventParams);
-    //         // toElement.dispatchEvent(fakeEvent);
-
-    //         console.log('sending fake event', eventName, newEventParams);
-
-    //         const fn =
-    //             eventName === 'mousedown'
-    //                 ? simulateMouseDown
-    //                 : eventName === 'mousemove'
-    //                 ? simulateMouseMove
-    //                 : simulateMouseUp;
-
-    //         console.log({
-    //             x: newEventParams.clientX,
-    //             y: newEventParams.clientY,
-    //         });
-
-    //         fn(stage, {
-    //             x: newEventParams.clientX,
-    //             y: newEventParams.clientY,
-    //         } as any);
-
-    //         // const fn =
-    //         //     eventName === 'pointerdown'
-    //         //         ? stage._pointerdown
-    //         //         : eventName === 'pointermove'
-    //         //         ? stage._pointermove
-    //         //         : stage._pointerup;
-
-    //         // fn.call(stage, {
-    //         //     clientX: newEventParams.clientX,
-    //         //     clientY: newEventParams.clientY,
-    //         //     button: 0,
-    //         //     pointerId: 1,
-    //         //     type: eventName,
-    //         // } as any);
-
-    //         if (eventName !== 'mouseup') {
-    //             event.stopPropagation();
-    //         }
-    //     });
-};
-
-const konvaCanvas = getCanvasForLayer(layer);
+// this property is not documented
+const konvaCanvas = layer.getCanvas()._canvas;
 const { updateTexture, camera, scene, controls, renderer } = initializeThree(
     threeContainer,
-    konvaCanvas
+    konvaCanvas,
 );
 
 layer.on('draw', () => {
@@ -258,17 +133,26 @@ layer.on('draw', () => {
     const raycaster = new THREE.Raycaster();
     const normalizedCoordinates = new THREE.Vector2();
 
-    const boundingRect = renderer.domElement.getBoundingClientRect();
+    const rendererBoundingRect = renderer.domElement.getBoundingClientRect();
 
-    setupMouseEventsPassthrough(renderer.domElement, konvaContainer, (event) => {
-        const relativeX =
-            (event.clientX - boundingRect.left) * (renderer.domElement.width / boundingRect.width);
-        const relativeY =
-            (event.clientY - boundingRect.top) * (renderer.domElement.height / boundingRect.height);
+    /**
+     * maps a mouse event which occured on the threejs canvas to the corresponding
+     * position on the konva canvas
+     */
+    const mapThreeEventToKonvaPosition = (
+        event: MouseEvent,
+    ): { x: number; y: number } | undefined => {
+        const relativeThreeX =
+            (event.clientX - rendererBoundingRect.left) *
+            (renderer.domElement.width / rendererBoundingRect.width);
+        const relativeThreeY =
+            (event.clientY - rendererBoundingRect.top) *
+            (renderer.domElement.height / rendererBoundingRect.height);
 
-        normalizedCoordinates.x = (relativeX / renderer.domElement.width) * 2 - 1;
-        normalizedCoordinates.y = -(relativeY / renderer.domElement.height) * 2 + 1;
+        normalizedCoordinates.x = (relativeThreeX / renderer.domElement.width) * 2 - 1;
+        normalizedCoordinates.y = -(relativeThreeY / renderer.domElement.height) * 2 + 1;
 
+        // perf: should only update this if the camera has changed
         camera.updateProjectionMatrix();
 
         raycaster.setFromCamera(normalizedCoordinates, camera);
@@ -280,81 +164,63 @@ layer.on('draw', () => {
             return undefined;
         }
 
-        const relativePosition = {
-            x: intersectUv.x * layer.width(),
-            y: (1 - intersectUv.y) * layer.height(),
+        return {
+            x: intersectUv.x * stage.width(),
+            // threejs uv-coordinates have their origin in the bottom left (not top left)
+            // yes this is different from basically all other implementations
+            y: (1 - intersectUv.y) * stage.height(),
         };
+    };
 
-        return relativePosition;
-    });
-}
+    /**
+     * we are passing events from the threejs canvas to the konva canvas
+     * konva checks that a drag has ended by always listening to mouseMove/mouseUp
+     * on the window, so we dispatch those events on there
+     * this is only tested for basic transformer interaction, it seems likely that
+     * there are some other edge cases in which events need to be dispatched slightly
+     * differently, eg. with more/other properties
+     * stopping propagation is important to prevent the original event from also being
+     * handled by konva (since, while dragging, it will treat all mouse move events as
+     * being part of the same drag) which would break everything
+     */
 
-function simulateMouseDown(stage: Konva.Stage, pos: { x: number; y: number }) {
-    // simulatePointerDown(stage, pos);
+    const handleMouseDown = (event: MouseEvent) => {
+        const position = mapThreeEventToKonvaPosition(event);
+        if (position == null) {
+            return;
+        }
 
-    stage._pointerdown(
-        new MouseEvent('mousedown', {
-            clientX: pos.x,
-            clientY: pos.y,
+        stage.content.dispatchEvent(
+            new MouseEvent('mousedown', { clientX: position.x, clientY: position.y, button: 0 }),
+        );
+        event.stopPropagation();
+    };
+    const handleMouseMove = (event: MouseEvent) => {
+        const position = mapThreeEventToKonvaPosition(event);
+        if (position == null) {
+            return;
+        }
+
+        window.dispatchEvent(new MouseEvent('mousemove', {
+            clientX: position.x,
+            clientY: position.y,
             button: 0,
-        })
-    );
-}
-
-function simulateMouseMove(stage: Konva.Stage, pos: { x: number; y: number }) {
-    // simulatePointerMove(stage, pos);
-
-    const event = new MouseEvent('mousemove', {
-        clientX: pos.x,
-        clientY: pos.y,
-        button: 0,
-    });
-
-    Konva.DD._drag(event);
-    // stage._pointermove(event);
-}
-
-function simulateMouseUp(stage: Konva.Stage, pos: { x: number; y: number }) {
-    simulatePointerUp(stage, pos);
-
-    var evt = {
-        clientX: pos.x,
-        clientY: pos.y,
-        button: pos.button || 0,
-        type: 'mouseup',
+        });
+        event.stopPropagation();
     };
-}
+    const handleMouseUp = (event: MouseEvent) => {
+        const position = mapThreeEventToKonvaPosition(event);
+        if (position == null) {
+            return;
+        }
 
-function simulatePointerDown(stage: Konva.Stage, pos: { x: number; y: number }) {
-    stage._pointerdown({
-        clientX: pos.x,
-        clientY: pos.y,
-        button: pos.button || 0,
-        pointerId: pos.pointerId || 1,
-        type: 'pointerdown',
-    } as any);
-}
-
-function simulatePointerMove(stage: Konva.Stage, pos: { x: number; y: number }) {
-    var evt = {
-        clientX: pos.x,
-        clientY: pos.y,
-        button: pos.button || 0,
-        pointerId: pos.pointerId || 1,
-        type: 'pointermove',
+        window.dispatchEvent(
+            new MouseEvent('mouseup', { clientX: position.x, clientY: position.y, button: 0 }),
+        );
+        event.stopPropagation();
     };
 
-    stage._pointermove(evt as any);
-}
-
-function simulatePointerUp(stage: Konva.Stage, pos: { x: number; y: number }) {
-    var evt = {
-        clientX: pos.x,
-        clientY: pos.y,
-        button: pos.button || 0,
-        pointerId: pos.pointerId || 1,
-        type: 'pointerup',
-    };
-
-    stage._pointerup(evt as any);
+    renderer.domElement.addEventListener('mousedown', handleMouseDown);
+    renderer.domElement.addEventListener('mousemove', handleMouseMove);
+    renderer.domElement.addEventListener('mouseup', handleMouseUp);
 }
