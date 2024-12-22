@@ -125,77 +125,123 @@ const { layer, transformer, stage } = initializeKonva(konvaContainer);
 const setupMouseEventsPassthrough = (
     fromElement: HTMLElement,
     toElement: HTMLElement,
-    transformEvent: (event: MouseEvent) => MouseEventInit | undefined
+    getPositionFromEvent: (event: MouseEvent) => { x: number; y: number } | null
 ) => {
-    const eventNamesWithNewState = [
-        ['mousedown', true],
-        ['mousemove', undefined],
-        ['mouseup', false],
-    ] as const;
+    const handleMouseDown = (event: MouseEvent) => {
+        const position = getPositionFromEvent(event);
+        if (position == null) {
+            return;
+        }
 
-    let isHoldingMouseDown = false;
+        // simulateMouseDown(stage, position);
+        toElement.dispatchEvent(
+            new MouseEvent('mousedown', { clientX: position.x, clientY: position.y })
+        );
+        event.stopPropagation();
+    };
+    const handleMouseMove = (event: MouseEvent) => {
+        const position = getPositionFromEvent(event);
+        if (position == null) {
+            return;
+        }
 
-    for (const [eventName, newMouseDownState] of eventNamesWithNewState) {
-        fromElement.addEventListener(eventName, (event) => {
-            if (event.button !== 0) {
-                return;
-            }
+        // simulateMouseMove(stage, position);
+        toElement.dispatchEvent(
+            new MouseEvent('mousemove', { clientX: position.x, clientY: position.y })
+        );
+        event.stopPropagation();
+    };
+    const handleMouseUp = (event: MouseEvent) => {
+        const position = getPositionFromEvent(event);
+        if (position == null) {
+            return;
+        }
 
-            if (newMouseDownState == null && !isHoldingMouseDown) {
-                return;
-            }
+        // simulateMouseUp(stage, position);
+        toElement.dispatchEvent(
+            new MouseEvent('mouseup', { clientX: position.x, clientY: position.y })
+        );
+        event.stopPropagation();
+    };
 
-            if (newMouseDownState != null) {
-                isHoldingMouseDown = newMouseDownState;
-            }
+    fromElement.addEventListener('mousedown', handleMouseDown);
+    fromElement.addEventListener('mousemove', handleMouseMove);
+    fromElement.addEventListener('mouseup', handleMouseUp);
 
-            const newEventParams = transformEvent(event);
-            if (!newEventParams) {
-                return;
-            }
+    return () => {
+        fromElement.removeEventListener('mousedown', handleMouseDown);
+        fromElement.removeEventListener('mousemove', handleMouseMove);
+        fromElement.removeEventListener('mouseup', handleMouseUp);
+    };
 
-            // const fakeEvent = new MouseEvent(eventName, newEventParams);
-            // toElement.dispatchEvent(fakeEvent);
+    // const eventNamesWithNewState = [
+    //     ['mousedown', true],
+    //     ['mousemove', undefined],
+    //     ['mouseup', false],
+    // ] as const;
 
-            console.log('sending fake event', eventName, newEventParams);
+    // let isHoldingMouseDown = false;
 
-            const fn =
-                eventName === 'mousedown'
-                    ? simulateMouseDown
-                    : eventName === 'mousemove'
-                    ? simulateMouseMove
-                    : simulateMouseUp;
+    // for (const [eventName, newMouseDownState] of eventNamesWithNewState) {
+    //     fromElement.addEventListener(eventName, (event) => {
+    //         if (event.button !== 0) {
+    //             return;
+    //         }
 
-            console.log({
-                x: newEventParams.clientX,
-                y: newEventParams.clientY,
-            });
+    //         if (newMouseDownState == null && !isHoldingMouseDown) {
+    //             return;
+    //         }
 
-            fn(stage, {
-                x: newEventParams.clientX,
-                y: newEventParams.clientY,
-            } as any);
+    //         if (newMouseDownState != null) {
+    //             isHoldingMouseDown = newMouseDownState;
+    //         }
 
-            // const fn =
-            //     eventName === 'pointerdown'
-            //         ? stage._pointerdown
-            //         : eventName === 'pointermove'
-            //         ? stage._pointermove
-            //         : stage._pointerup;
+    //         const newEventParams = transformEvent(event);
+    //         if (!newEventParams) {
+    //             return;
+    //         }
 
-            // fn.call(stage, {
-            //     clientX: newEventParams.clientX,
-            //     clientY: newEventParams.clientY,
-            //     button: 0,
-            //     pointerId: 1,
-            //     type: eventName,
-            // } as any);
+    //         // const fakeEvent = new MouseEvent(eventName, newEventParams);
+    //         // toElement.dispatchEvent(fakeEvent);
 
-            if (eventName !== 'mouseup') {
-                event.stopPropagation();
-            }
-        });
-    }
+    //         console.log('sending fake event', eventName, newEventParams);
+
+    //         const fn =
+    //             eventName === 'mousedown'
+    //                 ? simulateMouseDown
+    //                 : eventName === 'mousemove'
+    //                 ? simulateMouseMove
+    //                 : simulateMouseUp;
+
+    //         console.log({
+    //             x: newEventParams.clientX,
+    //             y: newEventParams.clientY,
+    //         });
+
+    //         fn(stage, {
+    //             x: newEventParams.clientX,
+    //             y: newEventParams.clientY,
+    //         } as any);
+
+    //         // const fn =
+    //         //     eventName === 'pointerdown'
+    //         //         ? stage._pointerdown
+    //         //         : eventName === 'pointermove'
+    //         //         ? stage._pointermove
+    //         //         : stage._pointerup;
+
+    //         // fn.call(stage, {
+    //         //     clientX: newEventParams.clientX,
+    //         //     clientY: newEventParams.clientY,
+    //         //     button: 0,
+    //         //     pointerId: 1,
+    //         //     type: eventName,
+    //         // } as any);
+
+    //         if (eventName !== 'mouseup') {
+    //             event.stopPropagation();
+    //         }
+    //     });
 };
 
 const konvaCanvas = getCanvasForLayer(layer);
@@ -213,8 +259,6 @@ layer.on('draw', () => {
     const normalizedCoordinates = new THREE.Vector2();
 
     const boundingRect = renderer.domElement.getBoundingClientRect();
-
-    console.log(layer.width(), layer.height());
 
     setupMouseEventsPassthrough(renderer.domElement, konvaContainer, (event) => {
         const relativeX =
@@ -241,10 +285,7 @@ layer.on('draw', () => {
             y: (1 - intersectUv.y) * layer.height(),
         };
 
-        return {
-            clientX: relativePosition.x,
-            clientY: relativePosition.y,
-        };
+        return relativePosition;
     });
 }
 
@@ -274,7 +315,7 @@ function simulateMouseMove(stage: Konva.Stage, pos: { x: number; y: number }) {
 }
 
 function simulateMouseUp(stage: Konva.Stage, pos: { x: number; y: number }) {
-    // simulatePointerUp(stage, pos);
+    simulatePointerUp(stage, pos);
 
     var evt = {
         clientX: pos.x,
