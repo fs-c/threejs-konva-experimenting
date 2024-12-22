@@ -3,11 +3,27 @@ import './style.css';
 
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTF, GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import Konva from 'konva';
 
-const initializeKonva = (
-    container: HTMLDivElement,
-): { layer: Konva.Layer; transformer: Konva.Transformer; stage: Konva.Stage } => {
+class AsyncGLTFLoader {
+    private readonly loader = new GLTFLoader();
+
+    public async load(url: string): Promise<GLTF> {
+        return new Promise((resolve, reject) => {
+            this.loader.load(
+                url,
+                (gltf) => {
+                    resolve(gltf);
+                },
+                undefined,
+                reject
+            );
+        });
+    }
+}
+
+const initializeKonva = (container: HTMLDivElement): { layer: Konva.Layer; stage: Konva.Stage } => {
     const containerDimensions = container.getBoundingClientRect();
     const height = Math.min(containerDimensions.width, containerDimensions.height);
     const width = height;
@@ -24,7 +40,7 @@ const initializeKonva = (
     const background = new Konva.Rect({
         width: stage.width(),
         height: stage.height(),
-        fill: 'black',
+        fill: '#FFD2A0',
     });
     layer.add(background);
 
@@ -32,36 +48,24 @@ const initializeKonva = (
         x: stage.width() / 2,
         y: stage.height() / 2,
         radius: 70,
-        fill: '#1e40af',
-        stroke: 'black',
+        fill: '#A888B5',
+        stroke: '#8174A0',
         strokeWidth: 4,
         draggable: true,
     });
     layer.add(circle);
-
-    circle.on('dragstart', (evt) => {
-        console.log('dragstart', evt.evt.clientX, evt.evt.clientY);
-    });
-
-    circle.on('dragmove', (evt) => {
-        console.log('dragmove', evt.evt.clientX, evt.evt.clientY);
-    });
-
-    circle.on('dragend', (evt) => {
-        console.log('dragend', evt.evt.clientX, evt.evt.clientY);
-    });
 
     const transformer = new Konva.Transformer();
     layer.add(transformer);
 
     transformer.nodes([circle]);
 
-    return { layer, transformer, stage };
+    return { layer, stage };
 };
 
 const initializeThree = (
     container: HTMLElement,
-    canvas: HTMLCanvasElement,
+    canvas: HTMLCanvasElement
 ): {
     updateTexture: () => {};
     camera: THREE.PerspectiveCamera;
@@ -77,7 +81,7 @@ const initializeThree = (
     container.appendChild(renderer.domElement);
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xeeeeee);
+    scene.background = new THREE.Color('white');
 
     const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
     camera.position.z = 5;
@@ -106,6 +110,12 @@ const initializeThree = (
     };
 };
 
+const getUVRectangleForMaterial = (model: THREE.Group<THREE.Object3DEventMap>): { width: number; height: number } => {
+    model.traverse((node) => {
+        if (!node.isMesh || )
+    })
+};
+
 const konvaContainer = document.getElementById('konva-container');
 if (!konvaContainer || !(konvaContainer instanceof HTMLDivElement)) {
     throw new Error('Konva container not found or not a <div>');
@@ -118,12 +128,43 @@ if (!threeContainer) {
 
 const { layer, stage } = initializeKonva(konvaContainer);
 
-// this property is not documented
-const konvaCanvas = layer.getCanvas()._canvas;
-const { updateTexture, camera, scene, controls, renderer } = initializeThree(
-    threeContainer,
-    konvaCanvas,
-);
+const { width, height } = threeContainer.getBoundingClientRect();
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(width, height);
+renderer.setPixelRatio(window.devicePixelRatio);
+threeContainer.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('white');
+
+const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+camera.position.z = 5;
+
+renderer.setAnimationLoop(() => {
+    renderer.render(scene, camera);
+});
+
+const loader = new AsyncGLTFLoader();
+const model = (await loader.load('assets/ugly-cup-4.glb')).scene;
+
+const planeTexture = new THREE.CanvasTexture(canvas);
+const planeMaterial = new THREE.MeshBasicMaterial({ map: planeTexture });
+const planeGeometry = new THREE.PlaneGeometry(2, 2);
+
+const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+scene.add(plane);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.mouseButtons.LEFT = undefined;
+controls.mouseButtons.RIGHT = THREE.MOUSE.ROTATE;
+
+// // this property is not documented
+// const konvaCanvas = layer.getCanvas()._canvas;
+// const { updateTexture, camera, scene, controls, renderer } = initializeThree(
+//     threeContainer,
+//     konvaCanvas
+// );
 
 layer.on('draw', () => {
     updateTexture();
@@ -140,7 +181,7 @@ layer.on('draw', () => {
      * position on the konva canvas
      */
     const mapThreeEventToKonvaPosition = (
-        event: MouseEvent,
+        event: MouseEvent
     ): { x: number; y: number } | undefined => {
         const relativeThreeX =
             (event.clientX - rendererBoundingRect.left) *
@@ -184,41 +225,35 @@ layer.on('draw', () => {
      * being part of the same drag) which would break everything
      */
 
-    const handleMouseDown = (event: MouseEvent) => {
-        const position = mapThreeEventToKonvaPosition(event);
-        if (position == null) {
-            return;
-        }
+    const handleEventWrapper = (
+        handler: (position: { x: number; y: number }) => void
+    ): ((event: MouseEvent) => void) => {
+        return (event: MouseEvent) => {
+            if (event.button !== 0) {
+                return;
+            }
 
-        stage.content.dispatchEvent(
-            new MouseEvent('mousedown', { clientX: position.x, clientY: position.y, button: 0 }),
-        );
-        event.stopPropagation();
-    };
-    const handleMouseMove = (event: MouseEvent) => {
-        const position = mapThreeEventToKonvaPosition(event);
-        if (position == null) {
-            return;
-        }
+            const position = mapThreeEventToKonvaPosition(event);
+            if (position == null) {
+                return;
+            }
 
-        window.dispatchEvent(new MouseEvent('mousemove', {
-            clientX: position.x,
-            clientY: position.y,
-            button: 0,
-        });
-        event.stopPropagation();
+            event.stopPropagation();
+            handler(position);
+        };
     };
-    const handleMouseUp = (event: MouseEvent) => {
-        const position = mapThreeEventToKonvaPosition(event);
-        if (position == null) {
-            return;
-        }
 
-        window.dispatchEvent(
-            new MouseEvent('mouseup', { clientX: position.x, clientY: position.y, button: 0 }),
-        );
-        event.stopPropagation();
-    };
+    const handleMouseDown = handleEventWrapper(({ x, y }) => {
+        stage.content.dispatchEvent(new MouseEvent('mousedown', { clientX: x, clientY: y }));
+    });
+
+    const handleMouseMove = handleEventWrapper(({ x, y }) => {
+        window.dispatchEvent(new MouseEvent('mousemove', { clientX: x, clientY: y }));
+    });
+
+    const handleMouseUp = handleEventWrapper(({ x, y }) => {
+        window.dispatchEvent(new MouseEvent('mouseup', { clientX: x, clientY: y }));
+    });
 
     renderer.domElement.addEventListener('mousedown', handleMouseDown);
     renderer.domElement.addEventListener('mousemove', handleMouseMove);
